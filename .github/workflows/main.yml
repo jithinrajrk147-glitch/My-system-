@@ -14,14 +14,12 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-      - name: Create files
+      - name: Create package.json
+        run: echo '{"name":"tg-collector","version":"1.0.0","dependencies":{"@capacitor/android":"^6.1.2","@capacitor/core":"^6.1.2","@capacitor/local-notifications":"^6.1.2","@capacitor-community/keep-awake":"^5.0.2"},"devDependencies":{"@capacitor/cli":"^6.1.2"}}' > package.json
+      - name: Create capacitor.config.json
+        run: echo '{"appId":"com.anxroall.collector","appName":"TG Collector","webDir":"www","plugins":{"LocalNotifications":{"smallIcon":"ic_stat_icon_default","iconColor":"#00ff99","sound":"default"}}}' > capacitor.config.json
+      - name: Create index.html
         run: |
-          cat > package.json << 'EOF'
-          {"name":"tg-collector","version":"1.0.0","dependencies":{"@capacitor/android":"^6.1.2","@capacitor/core":"^6.1.2","@capacitor/local-notifications":"^6.1.2","@capacitor-community/keep-awake":"^5.0.2"},"devDependencies":{"@capacitor/cli":"^6.1.2"}}
-          EOF
-          cat > capacitor.config.json << 'EOF'
-          {"appId":"com.anxroall.collector","appName":"TG Collector","webDir":"www","plugins":{"LocalNotifications":{"smallIcon":"ic_stat_icon_default","iconColor":"#00ff99","sound":"default"}}}
-          EOF
           cat > index.html << 'HTMLEOF'
           <!DOCTYPE html>
           <html lang="en">
@@ -49,7 +47,7 @@ jobs:
           <style>
           body {margin:0;font-family:Arial;background:#0f0f0f;color:white;}
           #topBar {background:#1f1f1f;padding:10px;overflow-x:auto;white-space:nowrap;border-bottom:1px solid #333;}
-         .tag {display:inline-block;background:#00ff99;color:black;padding:5px 10px;margin:3px;border-radius:20px;font-size:12px;}
+          .tag {display:inline-block;background:#00ff99;color:black;padding:5px 10px;margin:3px;border-radius:20px;font-size:12px;}
           #status {text-align:center;font-size:12px;padding:8px;color:#aaa;font-weight:bold;}
           #status.active { color:#00ff99; }
           #status.resting { color:#f78166; }
@@ -57,23 +55,23 @@ jobs:
           #status.pushing { color:#f0883e; }
           #status.error { color:#f85149; }
           #controls {background:#1a1a1a;padding:10px;text-align:center;border-bottom:1px solid #333;}
-         .btn {background:#238636;border:none;color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;cursor:pointer;margin:0 5px;}
-         .btn:hover { background:#2ea043; }
-         .btn.stop { background:#da3633; }
-         .btn.stop:hover { background:#f85149; }
-         .token-input {background:#0d1117;border:1px solid #30363d;color:#fff;padding:6px 10px;border-radius:6px;font-size:12px;width:200px;margin-right:5px;}
-         .stats {display:inline-block;font-size:11px;color:#7d8590;margin-left:10px;}
+          .btn {background:#238636;border:none;color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;cursor:pointer;margin:0 5px;}
+          .btn:hover { background:#2ea043; }
+          .btn.stop { background:#da3633; }
+          .btn.stop:hover { background:#f85149; }
+          .token-input {background:#0d1117;border:1px solid #30363d;color:#fff;padding:6px 10px;border-radius:6px;font-size:12px;width:200px;margin-right:5px;}
+          .stats {display:inline-block;font-size:11px;color:#7d8590;margin-left:10px;}
           #feed {padding:10px;max-height:75vh;overflow-y:auto;}
-         .post {background:#1a1a1a;padding:12px;margin-bottom:10px;border-radius:10px;}
-         .post-header {display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
-         .badge {font-size:10px;padding:3px 8px;border-radius:4px;background:#00ff99;color:#000;font-weight:bold;}
-         .badge.duplicate { background:#f78166; }
-         .badge.new { background:#238636; }
-         .badge.pending { background:#6e7681; }
-         .badge.failed { background:#f85149; }
-         .compressed-text {word-break:break-all;font-size:11px;color:#666;max-height:30px;overflow:hidden;margin-bottom:6px;}
-         .parsed {margin-top:8px;padding:10px;background:#0d1117;border-radius:6px;font-size:12px;font-family:monospace;border-left:3px solid #00ff99;}
-         .error {color:#f85149;font-size:12px;padding:8px;background:#1f1617;border-radius:6px;}
+          .post {background:#1a1a1a;padding:12px;margin-bottom:10px;border-radius:10px;}
+          .post-header {display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+          .badge {font-size:10px;padding:3px 8px;border-radius:4px;background:#00ff99;color:#000;font-weight:bold;}
+          .badge.duplicate { background:#f78166; }
+          .badge.new { background:#238636; }
+          .badge.pending { background:#6e7681; }
+          .badge.failed { background:#f85149; }
+          .compressed-text {word-break:break-all;font-size:11px;color:#666;max-height:30px;overflow:hidden;margin-bottom:6px;}
+          .parsed {margin-top:8px;padding:10px;background:#0d1117;border-radius:6px;font-size:12px;font-family:monospace;border-left:3px solid #00ff99;}
+          .error {color:#f85149;font-size:12px;padding:8px;background:#1f1617;border-radius:6px;}
           </style>
           </head>
           <body>
@@ -128,12 +126,9 @@ jobs:
                     if (item.link) seen.add(item.link);
                     if (item.name && item.link) seen.add(item.name + item.link);
                   });
-                  console.log(`Loaded ${data.length} existing items`);
                 }
               }
-            } catch (e) {
-              console.log('No existing Database.json');
-            }
+            } catch (e) {}
           }
           function toggleSystem() {
             const btn = document.getElementById('toggleBtn');
@@ -164,7 +159,7 @@ jobs:
               window.showNotify('TG Collector', 'System started - collecting from @' + CHANNEL);
               loadExistingIds().then(() => {
                 fetchInterval = setInterval(() => {
-                  if (isActive &&!isProcessing) {
+                  if (isActive && !isProcessing) {
                     fetchOne(0);
                     fetchOne(1);
                     fetchOne(2);
@@ -179,7 +174,7 @@ jobs:
             }
           }
           async function fetchOne(proxyIndex = 0) {
-            if (!isActive ||!systemRunning || isProcessing) return;
+            if (!isActive || !systemRunning || isProcessing) return;
             try {
               let random = Date.now() + "_" + Math.random();
               const proxies = [
@@ -225,7 +220,7 @@ jobs:
             let isCompressed = false;
             try {
               const decompressed = LZString.decompressFromUTF16(compressedText);
-              if (decompressed && decompressed!== compressedText) {
+              if (decompressed && decompressed !== compressedText) {
                 try {
                   jsonData = JSON.parse(decompressed);
                   isCompressed = true;
@@ -236,7 +231,7 @@ jobs:
             } catch (e) {
               isCompressed = false;
             }
-            if (!jsonData &&!isCompressed) {
+            if (!jsonData && !isCompressed) {
               try {
                 jsonData = JSON.parse(compressedText);
                 parseError = null;
@@ -264,13 +259,13 @@ jobs:
             let header = document.createElement("div");
             header.className = "post-header";
             let badge = document.createElement("span");
-            badge.className = jsonData? "badge pending" : "badge duplicate";
-            badge.innerText = jsonData? "PENDING" : "SKIP";
+            badge.className = jsonData ? "badge pending" : "badge duplicate";
+            badge.innerText = jsonData ? "PENDING" : "SKIP";
             header.appendChild(badge);
             div.appendChild(header);
             let compressedDiv = document.createElement("div");
             compressedDiv.className = "compressed-text";
-            compressedDiv.innerText = (isCompressed? "Compressed: " : "JSON: ") + compressedText.substring(0, 100) + "...";
+            compressedDiv.innerText = (isCompressed ? "Compressed: " : "JSON: ") + compressedText.substring(0, 100) + "...";
             div.appendChild(compressedDiv);
             if (jsonData) {
               let parsed = document.createElement("div");
@@ -399,7 +394,7 @@ jobs:
               delete clean._status;
               return clean;
             });
-            const updatedContent = [...existingContent,...cleanNewItems];
+            const updatedContent = [...existingContent, ...cleanNewItems];
             const jsonStr = JSON.stringify(updatedContent, null, 2);
             if (jsonStr.length > FILE_SIZE_LIMIT) {
               document.getElementById("status").innerText = "✗ File too large >950KB";
@@ -514,12 +509,12 @@ jobs:
               document.getElementById("status").className = "active";
               window.showNotify('Cycle Started', 'Collecting for 2 minutes');
             } else {
-              const remaining = isActive? ACTIVE_TIME - elapsed : REST_TIME - elapsed;
+              const remaining = isActive ? ACTIVE_TIME - elapsed : REST_TIME - elapsed;
               const mins = Math.floor(remaining / 60000);
               const secs = Math.floor((remaining % 60000) / 1000);
-              const state = isActive? "Active" : "Resting";
+              const state = isActive ? "Active" : "Resting";
               const statusEl = document.getElementById("status");
-              if (!statusEl.className.includes("checking") &&!statusEl.className.includes("pushing") &&!statusEl.className.includes("error")) {
+              if (!statusEl.className.includes("checking") && !statusEl.className.includes("pushing") && !statusEl.className.includes("error")) {
                 statusEl.innerText = `${state}: ${mins}m ${secs}s remaining`;
               }
             }
@@ -540,7 +535,7 @@ jobs:
         run: |
           mkdir -p android/app/src/main/java/com/anxroall/collector
           echo 'package com.anxroall.collector; import android.content.BroadcastReceiver; import android.content.Context; import android.content.Intent; public class BootReceiver extends BroadcastReceiver { @Override public void onReceive(Context context, Intent intent) { if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) { Intent i = new Intent(context, MainActivity.class); i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); context.startActivity(i); } } }' > android/app/src/main/java/com/anxroall/collector/BootReceiver.java
-      - run: cd android && chmod +x gradlew &&./gradlew assembleDebug
+      - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: TG-Collector-APK
