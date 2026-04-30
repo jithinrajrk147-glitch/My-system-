@@ -17,27 +17,530 @@ jobs:
       - name: Create files
         run: |
           cat > package.json << 'EOF'
-          {"name":"tg-collector","version":"1.0.0","dependencies":{"@capacitor/android":"^6.1.2","@capacitor/core":"^6.1.2"},"devDependencies":{"@capacitor/cli":"^6.1.2"}}
+          {"name":"tg-collector","version":"1.0.0","dependencies":{"@capacitor/android":"^6.1.2","@capacitor/core":"^6.1.2","@capacitor/local-notifications":"^6.1.2","@capacitor-community/keep-awake":"^5.0.2"},"devDependencies":{"@capacitor/cli":"^6.1.2"}}
           EOF
           cat > capacitor.config.json << 'EOF'
-          {"appId":"com.anxroall.collector","appName":"TG Collector","webDir":"www"}
+          {"appId":"com.anxroall.collector","appName":"TG Collector","webDir":"www","plugins":{"LocalNotifications":{"smallIcon":"ic_stat_icon_default","iconColor":"#00ff99","sound":"default"}}}
           EOF
-          cat > index.html << 'EOF'
-          <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>TG Collector</title><style>body{font-family:sans-serif;padding:20px;background:#111;color:#0f0}input,button{width:100%;padding:10px;margin:5px 0}#log{height:200px;overflow-y:scroll;border:1px solid #0f0;padding:10px}</style></head><body><h3>TG Collector</h3><input id="token" placeholder="GitHub PAT Token"><button onclick="localStorage.setItem('gh_token',document.getElementById('token').value);log('Token saved')">Save Token</button><button onclick="log('System started - polling every 5 min')">Start System</button><div id="log">Ready...</div><script>const log=(msg)=>document.getElementById('log').innerHTML+='<br>'+msg;document.getElementById('token').value=localStorage.getItem('gh_token')||'';</script></body></html>
-          EOF
+          cat > index.html << 'HTMLEOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+          <meta charset="UTF-8">
+          <title>Telegram Collector - Clean Database</title>
+          <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
+          <script type="module">
+            import { Capacitor } from 'https://cdn.jsdelivr.net/npm/@capacitor/core@6.1.2/+esm';
+            import { LocalNotifications } from 'https://cdn.jsdelivr.net/npm/@capacitor/local-notifications@6.1.2/+esm';
+            if (Capacitor.isNativePlatform()) {
+              const { KeepAwake } = await import('https://cdn.jsdelivr.net/npm/@capacitor-community/keep-awake@5.0.2/+esm');
+              KeepAwake.keepAwake();
+              await LocalNotifications.requestPermissions();
+              console.log('KeepAwake + Notifications enabled');
+            }
+            window.showNotify = async (title, body) => {
+              if (Capacitor.isNativePlatform()) {
+                await LocalNotifications.schedule({
+                  notifications: [{ title, body, id: Date.now(), schedule: { at: new Date(Date.now() + 1000) } }]
+                });
+              }
+            };
+          </script>
+          <style>
+          body {margin:0;font-family:Arial;background:#0f0f0f;color:white;}
+          #topBar {background:#1f1f1f;padding:10px;overflow-x:auto;white-space:nowrap;border-bottom:1px solid #333;}
+         .tag {display:inline-block;background:#00ff99;color:black;padding:5px 10px;margin:3px;border-radius:20px;font-size:12px;}
+          #status {text-align:center;font-size:12px;padding:8px;color:#aaa;font-weight:bold;}
+          #status.active { color:#00ff99; }
+          #status.resting { color:#f78166; }
+          #status.checking { color:#1f6feb; }
+          #status.pushing { color:#f0883e; }
+          #status.error { color:#f85149; }
+          #controls {background:#1a1a1a;padding:10px;text-align:center;border-bottom:1px solid #333;}
+         .btn {background:#238636;border:none;color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;cursor:pointer;margin:0 5px;}
+         .btn:hover { background:#2ea043; }
+         .btn.stop { background:#da3633; }
+         .btn.stop:hover { background:#f85149; }
+         .token-input {background:#0d1117;border:1px solid #30363d;color:#fff;padding:6px 10px;border-radius:6px;font-size:12px;width:200px;margin-right:5px;}
+         .stats {display:inline-block;font-size:11px;color:#7d8590;margin-left:10px;}
+          #feed {padding:10px;max-height:75vh;overflow-y:auto;}
+         .post {background:#1a1a1a;padding:12px;margin-bottom:10px;border-radius:10px;}
+         .post-header {display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+         .badge {font-size:10px;padding:3px 8px;border-radius:4px;background:#00ff99;color:#000;font-weight:bold;}
+         .badge.duplicate { background:#f78166; }
+         .badge.new { background:#238636; }
+         .badge.pending { background:#6e7681; }
+         .badge.failed { background:#f85149; }
+         .compressed-text {word-break:break-all;font-size:11px;color:#666;max-height:30px;overflow:hidden;margin-bottom:6px;}
+         .parsed {margin-top:8px;padding:10px;background:#0d1117;border-radius:6px;font-size:12px;font-family:monospace;border-left:3px solid #00ff99;}
+         .error {color:#f85149;font-size:12px;padding:8px;background:#1f1617;border-radius:6px;}
+          </style>
+          </head>
+          <body>
+          <div id="topBar"></div>
+          <div id="controls">
+            <button class="btn" id="toggleBtn" onclick="toggleSystem()">▶️ Start System</button>
+            <input type="password" class="token-input" id="tokenInput" placeholder="GitHub PAT token" />
+            <button class="btn" onclick="saveToken()">💾 Save Token</button>
+            <span class="stats">Speed: <span id="speed">0</span> msg/s | Pending: <span id="pending">0</span> | Failed: <span id="failed">0</span></span>
+          </div>
+          <div id="status" class="active">System Stopped</div>
+          <div id="feed"></div>
+          <script>
+          const CHANNEL = "ehsbeud";
+          const GITHUB_USER = "anxroall-a";
+          const GITHUB_REPO = "Websitesdatabase";
+          let seen = new Set();
+          let isActive = false;
+          let systemRunning = false;
+          let cycleStart = Date.now();
+          let pendingUnits = [];
+          let failedUnits = [];
+          let fetchInterval = null;
+          let cycleInterval = null;
+          let isProcessing = false;
+          let msgCount = 0;
+          let lastSpeedCheck = Date.now();
+          const ACTIVE_TIME = 2*60*1000;
+          const REST_TIME = 3*60*1000;
+          const FILE_SIZE_LIMIT = 950 * 1024;
+          document.getElementById('tokenInput').value = localStorage.getItem('gh_token') || '';
+          function saveToken() {
+            const token = document.getElementById('tokenInput').value.trim();
+            if (token) {
+              localStorage.setItem('gh_token', token);
+              alert('Token saved');
+              window.showNotify('TG Collector', 'GitHub token saved successfully');
+            }
+          }
+          function updatePendingCount() {
+            document.getElementById('pending').innerText = pendingUnits.length;
+            document.getElementById('failed').innerText = failedUnits.length;
+          }
+          async function loadExistingIds() {
+            try {
+              const url = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/Database.json`;
+              const res = await fetch(url);
+              if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                  data.forEach(item => {
+                    if (item.link) seen.add(item.link);
+                    if (item.name && item.link) seen.add(item.name + item.link);
+                  });
+                  console.log(`Loaded ${data.length} existing items`);
+                }
+              }
+            } catch (e) {
+              console.log('No existing Database.json');
+            }
+          }
+          function toggleSystem() {
+            const btn = document.getElementById('toggleBtn');
+            if (systemRunning) {
+              systemRunning = false;
+              isActive = false;
+              clearInterval(fetchInterval);
+              clearInterval(cycleInterval);
+              fetchInterval = null;
+              cycleInterval = null;
+              btn.innerText = '▶️ Start System';
+              btn.className = 'btn';
+              document.getElementById('status').innerText = 'System Stopped';
+              document.getElementById('status').className = '';
+              window.showNotify('TG Collector', 'System stopped');
+            } else {
+              const token = localStorage.getItem('gh_token');
+              if (!token) {
+                alert('Enter GitHub PAT token first');
+                return;
+              }
+              systemRunning = true;
+              isActive = true;
+              cycleStart = Date.now();
+              msgCount = 0;
+              btn.innerText = '⏸️ Stop System';
+              btn.className = 'btn stop';
+              window.showNotify('TG Collector', 'System started - collecting from @' + CHANNEL);
+              loadExistingIds().then(() => {
+                fetchInterval = setInterval(() => {
+                  if (isActive &&!isProcessing) {
+                    fetchOne(0);
+                    fetchOne(1);
+                    fetchOne(2);
+                  }
+                }, 600);
+                cycleInterval = setInterval(updateCycle, 500);
+                for (let i = 0; i < 9; i++) {
+                  setTimeout(() => fetchOne(i % 3), i * 100);
+                }
+                updateCycle();
+              });
+            }
+          }
+          async function fetchOne(proxyIndex = 0) {
+            if (!isActive ||!systemRunning || isProcessing) return;
+            try {
+              let random = Date.now() + "_" + Math.random();
+              const proxies = [
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://t.me/s/${CHANNEL}?v=${random}`)}`,
+                `https://corsproxy.io/?${encodeURIComponent(`https://t.me/s/${CHANNEL}?v=${random}`)}`,
+                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://t.me/s/${CHANNEL}?v=${random}`)}`
+              ];
+              const proxyUrl = proxies[proxyIndex];
+              let res = await fetch(proxyUrl, {
+                method: 'GET',
+                headers: { 'Accept': 'text/html' },
+                signal: AbortSignal.timeout(1500)
+              });
+              if (!res.ok) return;
+              let html = await res.text();
+              if (!html || html.length < 100) return;
+              let doc = new DOMParser().parseFromString(html, "text/html");
+              let posts = doc.querySelectorAll(".tgme_widget_message_text");
+              if (posts.length === 0) return;
+              posts.forEach(p => {
+                let compressedText = p.innerText.trim();
+                if (!seen.has(compressedText) && compressedText.length > 10) {
+                  seen.add(compressedText);
+                  processMessage(compressedText);
+                  msgCount++;
+                }
+              });
+            } catch (e) {}
+          }
+          setInterval(() => {
+            const now = Date.now();
+            const elapsed = (now - lastSpeedCheck) / 1000;
+            const speed = (msgCount / elapsed).toFixed(1);
+            document.getElementById('speed').innerText = speed;
+            msgCount = 0;
+            lastSpeedCheck = now;
+          }, 1000);
+          function processMessage(compressedText) {
+            const topBar = document.getElementById("topBar");
+            const feed = document.getElementById("feed");
+            let jsonData = null;
+            let parseError = null;
+            let isCompressed = false;
+            try {
+              const decompressed = LZString.decompressFromUTF16(compressedText);
+              if (decompressed && decompressed!== compressedText) {
+                try {
+                  jsonData = JSON.parse(decompressed);
+                  isCompressed = true;
+                } catch(e) {
+                  parseError = 'Decompressed but not valid JSON';
+                }
+              }
+            } catch (e) {
+              isCompressed = false;
+            }
+            if (!jsonData &&!isCompressed) {
+              try {
+                jsonData = JSON.parse(compressedText);
+                parseError = null;
+              } catch(e) {
+                parseError = 'Not JSON - plain text message';
+              }
+            }
+            if (jsonData) {
+              jsonData.id = jsonData.id || crypto.randomUUID();
+              jsonData._compressed = compressedText;
+              jsonData._status = 'pending';
+              seen.add(jsonData.link);
+              seen.add(jsonData.name + jsonData.link);
+              pendingUnits.push(jsonData);
+              updatePendingCount();
+              window.showNotify('New Website Found', jsonData.name || jsonData.link);
+            }
+            let tag = document.createElement("div");
+            tag.className = "tag";
+            tag.innerText = compressedText.substring(0, 20) + "...";
+            topBar.prepend(tag);
+            let div = document.createElement("div");
+            div.className = "post";
+            div.dataset.compressed = compressedText;
+            let header = document.createElement("div");
+            header.className = "post-header";
+            let badge = document.createElement("span");
+            badge.className = jsonData? "badge pending" : "badge duplicate";
+            badge.innerText = jsonData? "PENDING" : "SKIP";
+            header.appendChild(badge);
+            div.appendChild(header);
+            let compressedDiv = document.createElement("div");
+            compressedDiv.className = "compressed-text";
+            compressedDiv.innerText = (isCompressed? "Compressed: " : "JSON: ") + compressedText.substring(0, 100) + "...";
+            div.appendChild(compressedDiv);
+            if (jsonData) {
+              let parsed = document.createElement("div");
+              parsed.className = "parsed";
+              parsed.innerHTML = `<b>Name:</b> ${jsonData.name || 'N/A'}<br><b>Link:</b> ${jsonData.link || 'N/A'}<br><b>Domain:</b> ${jsonData.domain || 'N/A'}<br><b>Type:</b> ${jsonData.type || 'N/A'}<br><b>Keywords:</b> ${(jsonData.keywords || []).join(', ')}<br><b>Location:</b> ${jsonData.location?.lat || '?'}, ${jsonData.location?.lng || '?'}<br><b>Description:</b> ${jsonData.description || 'N/A'}`;
+              div.appendChild(parsed);
+            } else {
+              let err = document.createElement("div");
+              err.className = "error";
+              err.innerText = "⚠ " + (parseError || 'Skipped - not valid JSON');
+              div.appendChild(err);
+            }
+            feed.prepend(div);
+          }
+          async function checkAllPendingUnits() {
+            if (pendingUnits.length === 0) return { newItems: [], duplicates: [] };
+            document.getElementById("status").innerText = "Step 3: Checking GitHub database...";
+            document.getElementById("status").className = "checking";
+            let existingData = [];
+            try {
+              const apiUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/`;
+              const res = await fetch(apiUrl, { signal: AbortSignal.timeout(8000) });
+              if (res.ok) {
+                const files = await res.json();
+                const jsonFiles = files.filter(f => f.name.endsWith('.json') && f.name.startsWith('Database'));
+                for (let file of jsonFiles) {
+                  try {
+                    const fileRes = await fetch(file.download_url, { signal: AbortSignal.timeout(5000) });
+                    if (fileRes.ok) {
+                      const data = await fileRes.json();
+                      if (Array.isArray(data)) {
+                        existingData.push(...data.flat(Infinity));
+                      }
+                    }
+                  } catch (e) {}
+                }
+              }
+            } catch (e) {}
+            let newItems = [];
+            let duplicates = [];
+            pendingUnits.forEach(newItem => {
+              const isDuplicate = existingData.some(existing => {
+                return existing.link === newItem.link && existing.name === newItem.name && existing.domain === newItem.domain;
+              });
+              if (isDuplicate) {
+                duplicates.push(newItem);
+              } else {
+                newItems.push(newItem);
+              }
+            });
+            updateBadges(newItems, duplicates);
+            return { newItems, duplicates };
+          }
+          function updateBadges(newItems, duplicates) {
+            const posts = document.querySelectorAll('.post');
+            const newLinks = new Set(newItems.map(i => i.link));
+            posts.forEach(post => {
+              const parsed = post.querySelector('.parsed');
+              if (!parsed) return;
+              const linkMatch = parsed.innerHTML.match(/<b>Link:<\/b> ([^<]+)/);
+              if (!linkMatch) return;
+              const link = linkMatch[1];
+              const badge = post.querySelector('.badge');
+              if (newLinks.has(link)) {
+                badge.innerText = "✓ NEW";
+                badge.className = "badge new";
+              } else {
+                badge.innerText = "⚠ DUPLICATE";
+                badge.className = "badge duplicate";
+              }
+            });
+          }
+          async function pushToGitHub(newItems) {
+            if (newItems.length === 0) return false;
+            const token = localStorage.getItem('gh_token');
+            if (!token) {
+              document.getElementById("status").innerText = "✗ No token";
+              document.getElementById("status").className = "error";
+              alert('No GitHub token! Add token first.');
+              return false;
+            }
+            document.getElementById("status").innerText = "Pushing to GitHub...";
+            document.getElementById("status").className = "pushing";
+            const fileName = 'Database.json';
+            const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${fileName}`;
+            let sha = null;
+            let existingContent = [];
+            try {
+              const getRes = await fetch(url, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `token ${token}`,
+                  'Accept': 'application/vnd.github.v3+json'
+                }
+              });
+              if (getRes.status === 200) {
+                const data = await getRes.json();
+                sha = data.sha;
+                const decoded = atob(data.content);
+                existingContent = JSON.parse(decoded);
+                if (!Array.isArray(existingContent)) existingContent = [];
+              } else if (getRes.status === 404) {
+                sha = null;
+                existingContent = [];
+              } else if (getRes.status === 401 || getRes.status === 403) {
+                document.getElementById("status").innerText = "✗ Token permission denied";
+                document.getElementById("status").className = "error";
+                window.showNotify('Push Failed', 'Token permission denied - check repo access');
+                alert('ERROR: Token cannot access repo.\n\nFix: GitHub → Settings → Developer settings → Personal access tokens → Generate new → CHECK "repo" box → Save new token');
+                return false;
+              } else {
+                document.getElementById("status").innerText = "✗ Cannot read file";
+                document.getElementById("status").className = "error";
+                alert(`Cannot read Database.json: ${getRes.status}`);
+                return false;
+              }
+            } catch (e) {
+              document.getElementById("status").innerText = "✗ Network error";
+              document.getElementById("status").className = "error";
+              alert('Network error: ' + e.message);
+              return false;
+            }
+            const cleanNewItems = newItems.map(item => {
+              const clean = {...item};
+              delete clean._compressed;
+              delete clean._status;
+              return clean;
+            });
+            const updatedContent = [...existingContent,...cleanNewItems];
+            const jsonStr = JSON.stringify(updatedContent, null, 2);
+            if (jsonStr.length > FILE_SIZE_LIMIT) {
+              document.getElementById("status").innerText = "✗ File too large >950KB";
+              document.getElementById("status").className = "error";
+              alert('Database.json will exceed 950KB. Cannot push.');
+              return false;
+            }
+            const base64Content = btoa(unescape(encodeURIComponent(jsonStr)));
+            const body = {
+              message: `Update: Add ${cleanNewItems.length} websites`,
+              content: base64Content
+            };
+            if (sha) {
+              body.sha = sha;
+            }
+            try {
+              const putRes = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `token ${token}`,
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/vnd.github.v3+json'
+                },
+                body: JSON.stringify(body)
+              });
+              if (putRes.ok) {
+                document.getElementById("status").innerText = `✓ Pushed ${cleanNewItems.length} items`;
+                document.getElementById("status").className = "active";
+                window.showNotify('GitHub Push Success', `Added ${cleanNewItems.length} new websites to database`);
+                return true;
+              } else {
+                const err = await putRes.json();
+                document.getElementById("status").innerText = `✗ Failed: ${err.message}`;
+                document.getElementById("status").className = "error";
+                window.showNotify('Push Failed', err.message);
+                alert(`Push failed: ${err.message}\n\nMost common cause: Token missing "repo" permission. Create new token with "repo" checked.`);
+                return false;
+              }
+            } catch (e) {
+              document.getElementById("status").innerText = "✗ Push error";
+              document.getElementById("status").className = "error";
+              alert('Push error: ' + e.message);
+              return false;
+            }
+          }
+          async function processBatch() {
+            if (pendingUnits.length === 0) return;
+            isProcessing = true;
+            isActive = false;
+            window.showNotify('Processing Batch', `Checking ${pendingUnits.length} items against database`);
+            const { newItems, duplicates } = await checkAllPendingUnits();
+            let pushSuccess = true;
+            if (newItems.length > 0) {
+              pushSuccess = await pushToGitHub(newItems);
+            } else {
+              document.getElementById("status").innerText = "All items already in database. Nothing to push.";
+              document.getElementById("status").className = "active";
+              window.showNotify('Batch Complete', 'All items were duplicates');
+            }
+            if (pushSuccess || newItems.length === 0) {
+              if (!pushSuccess && newItems.length > 0) {
+                failedUnits.push(...newItems);
+                updateBadgesForFailed(newItems);
+                updatePendingCount();
+              } else {
+                pendingUnits = [];
+                updatePendingCount();
+                document.getElementById('feed').innerHTML = '';
+                document.getElementById('topBar').innerHTML = '';
+              }
+            } else {
+              failedUnits.push(...newItems);
+              updateBadgesForFailed(newItems);
+              updatePendingCount();
+            }
+            isProcessing = false;
+          }
+          function updateBadgesForFailed(items) {
+            const posts = document.querySelectorAll('.post');
+            const failedLinks = new Set(items.map(i => i.link));
+            posts.forEach(post => {
+              const parsed = post.querySelector('.parsed');
+              if (!parsed) return;
+              const linkMatch = parsed.innerHTML.match(/<b>Link:<\/b> ([^<]+)/);
+              if (!linkMatch) return;
+              const link = linkMatch[1];
+              const badge = post.querySelector('.badge');
+              if (failedLinks.has(link)) {
+                badge.innerText = "✗ FAILED";
+                badge.className = "badge failed";
+              }
+            });
+          }
+          function updateCycle() {
+            if (!systemRunning) return;
+            const elapsed = Date.now() - cycleStart;
+            if (isActive && elapsed >= ACTIVE_TIME) {
+              processBatch();
+              isActive = false;
+              cycleStart = Date.now();
+              setTimeout(() => {
+                if (systemRunning) {
+                  document.getElementById("status").innerText = "Resting: 3 min pause...";
+                  document.getElementById("status").className = "resting";
+                  window.showNotify('Cycle Complete', 'Entering 3 min rest period');
+                }
+              }, 2000);
+            } else if (!isActive && elapsed >= REST_TIME) {
+              isActive = true;
+              cycleStart = Date.now();
+              document.getElementById("status").innerText = "Active: 2 min collecting...";
+              document.getElementById("status").className = "active";
+              window.showNotify('Cycle Started', 'Collecting for 2 minutes');
+            } else {
+              const remaining = isActive? ACTIVE_TIME - elapsed : REST_TIME - elapsed;
+              const mins = Math.floor(remaining / 60000);
+              const secs = Math.floor((remaining % 60000) / 1000);
+              const state = isActive? "Active" : "Resting";
+              const statusEl = document.getElementById("status");
+              if (!statusEl.className.includes("checking") &&!statusEl.className.includes("pushing") &&!statusEl.className.includes("error")) {
+                statusEl.innerText = `${state}: ${mins}m ${secs}s remaining`;
+              }
+            }
+          }
+          </script>
+          </body>
+          </html>
+          HTMLEOF
       - run: npm install
       - run: npx cap add android
       - run: mkdir www && cp index.html www/
       - run: npx cap sync android
       - name: Add permissions and boot receiver
         run: |
-          sed -i 's|</manifest>|<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/><uses-permission android:name="android.permission.WAKE_LOCK"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/></manifest>|' android/app/src/main/AndroidManifest.xml
+          sed -i 's|</manifest>|<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/><uses-permission android:name="android.permission.WAKE_LOCK"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"/></manifest>|' android/app/src/main/AndroidManifest.xml
           sed -i 's|</application>|<receiver android:enabled="true" android:exported="true" android:name=".BootReceiver" android:permission="android.permission.RECEIVE_BOOT_COMPLETED"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><category android:name="android.intent.category.DEFAULT"/></intent-filter></receiver></application>|' android/app/src/main/AndroidManifest.xml
       - name: Create BootReceiver
         run: |
           mkdir -p android/app/src/main/java/com/anxroall/collector
           echo 'package com.anxroall.collector; import android.content.BroadcastReceiver; import android.content.Context; import android.content.Intent; public class BootReceiver extends BroadcastReceiver { @Override public void onReceive(Context context, Intent intent) { if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) { Intent i = new Intent(context, MainActivity.class); i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); context.startActivity(i); } } }' > android/app/src/main/java/com/anxroall/collector/BootReceiver.java
-      - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
+      - run: cd android && chmod +x gradlew &&./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: TG-Collector-APK
