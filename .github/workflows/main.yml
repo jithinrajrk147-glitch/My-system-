@@ -29,9 +29,10 @@ jobs:
       - run: npx cap add android
       - run: mkdir www && cp index.html www/
       - run: npx cap sync android
-      - name: Add permissions
+      - name: Add permissions and boot receiver
         run: |
-          sed -i 's|</application>|<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/><uses-permission android:name="android.permission.WAKE_LOCK"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/><receiver android:enabled="true" android:exported="true" android:name=".BootReceiver" android:permission="android.permission.RECEIVE_BOOT_COMPLETED"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><category android:name="android.intent.category.DEFAULT"/></intent-filter></receiver></application>|' android/app/src/main/AndroidManifest.xml
+          sed -i 's|</manifest>|<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/><uses-permission android:name="android.permission.WAKE_LOCK"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/></manifest>|' android/app/src/main/AndroidManifest.xml
+          sed -i 's|</application>|<receiver android:enabled="true" android:exported="true" android:name=".BootReceiver" android:permission="android.permission.RECEIVE_BOOT_COMPLETED"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><category android:name="android.intent.category.DEFAULT"/></intent-filter></receiver></application>|' android/app/src/main/AndroidManifest.xml
       - name: Create BootReceiver
         run: |
           mkdir -p android/app/src/main/java/com/anxroall/collector
