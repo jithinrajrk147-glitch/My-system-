@@ -13,9 +13,9 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '6.1.2"}}'
       - name: Create package.json
-        run: echo '{"name":"tg-collector","version":"1.0.0","dependencies":{"@capacitor/android":"^6.1.2","@capacitor/core":"^6.1.2","@capacitor/local-notifications":"^6.1.2","@capacitor-community/keep-awake":"^5.0.2"},"devDependencies":{"@capacitor/cli":"^6.1.2"}}' > package.json
+        run: echo '{"name":"tg-collector","version":"1.0.0","dependencies":{"@capacitor/android":"^6.1.2","@capacitor/core":"^6.1.2","@capacitor/local-notifications":"^6.1.2","@capacitor-community/keep-awake":"^8.0.1"},"devDependencies":{"@capacitor/cli":"^6.1.2"}}' > package.json
       - name: Create capacitor.config.json
         run: echo '{"appId":"com.anxroall.collector","appName":"TG Collector","webDir":"www","plugins":{"LocalNotifications":{"smallIcon":"ic_stat_icon_default","iconColor":"#00ff99","sound":"default"}}}' > capacitor.config.json
       - name: Create index.html
