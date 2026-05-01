@@ -49,13 +49,13 @@ jobs:
               "cleartext": true
             },
             "android": {
-              "allowMixedContent": true
+              "allowMixedContent": true,
+              "backgroundColor": "#0f0f0f"
             },
             "plugins": {
               "LocalNotifications": {
                 "smallIcon": "ic_stat_icon_default",
-                "iconColor": "#00ff99",
-                "sound": "default"
+                "iconColor": "#00ff99"
               }
             }
           }
@@ -70,44 +70,20 @@ jobs:
       - name: Prepare web assets
         run: |
           mkdir www
-          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>TG Collector</title><script>location.href="https://anxroall-a.github.io/Websitesdatabase/index.html"</script></head><body>Loading...</body></html>' > www/index.html
+          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>TG Collector</title><meta name="viewport" content="width=device-width,initial-scale=1"><script>location.href="https://anxroall-a.github.io/Websitesdatabase/index.html"</script></head><body style="background:#0f0f0f;color:#fff;font-family:Arial;text-align:center;padding-top:50px;">Loading...</body></html>' > www/index.html
 
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Add permissions and receivers
+      - name: Add permissions only
         run: |
-          sed -i 's|</manifest>|<uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/><uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/><uses-permission android:name="android.permission.WAKE_LOCK"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"/></manifest>|' android/app/src/main/AndroidManifest.xml
-          sed -i 's|</application>|<receiver android:enabled="true" android:exported="true" android:name=".BootReceiver" android:permission="android.permission.RECEIVE_BOOT_COMPLETED"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><action android:name="android.intent.action.QUICKBOOT_POWERON"/></intent-filter></receiver></application>|' android/app/src/main/AndroidManifest.xml
-
-      - name: Create BootReceiver with imports
-        run: |
-          mkdir -p android/app/src/main/java/com/anxroall/collector
-          cat > android/app/src/main/java/com/anxroall/collector/BootReceiver.java << 'EOF'
-          package com.anxroall.collector;
-          import android.content.BroadcastReceiver;
-          import android.content.Context;
-          import android.content.Intent;
-          import com.getcapacitor.BridgeActivity;
-          
-          public class BootReceiver extends BroadcastReceiver {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-              if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction()) || 
-                  Intent.ACTION_QUICKBOOT_POWERON.equals(intent.getAction())) {
-                Intent i = new Intent(context, BridgeActivity.class);
-                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                context.startActivity(i);
-              }
-            }
-          }
-          EOF
+          sed -i 's|</manifest>|<uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/><uses-permission android:name="android.permission.WAKE_LOCK"/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"/></manifest>|' android/app/src/main/AndroidManifest.xml
 
       - name: Build APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
