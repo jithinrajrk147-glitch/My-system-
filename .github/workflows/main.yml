@@ -32,8 +32,7 @@ jobs:
               "@capacitor/local-notifications": "^6.1.2"
             },
             "devDependencies": {
-              "@capacitor/cli": "^6.1.2",
-              "@capacitor/assets": "^3.0.5"
+              "@capacitor/cli": "^6.1.2"
             }
           }
           EOF
@@ -72,9 +71,6 @@ jobs:
         run: |
           mkdir www
           echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>TG Collector</title><script>location.href="https://anxroall-a.github.io/Websitesdatabase/index.html"</script></head><body>Loading...</body></html>' > www/index.html
-
-      - name: Generate app icons
-        run: npx capacitor-assets generate --iconBackgroundColor '#0f0f0f' --iconOnly
 
       - name: Sync Capacitor
         run: npx cap sync android
