@@ -53,6 +53,93 @@ body {margin:0;font-family:Arial;background:#0f0f0f;color:white;}
 <div id="status" class="active">System Stopped</div>
 <div id="feed"></div>
 <script>
+// Add this to your existing JS, before toggleSystem()
+let systemRunning = localStorage.getItem('systemRunning') === 'true';
+let isActive = false;
+let cycleStart = parseInt(localStorage.getItem('cycleStart')) || Date.now();
+
+// Auto-resume on app start
+window.addEventListener('load', () => {
+  document.getElementById('tokenInput').value = localStorage.getItem('gh_token') || '';
+  
+  if (systemRunning) {
+    log('🔄 Auto-resuming system...');
+    notify('System Resumed', 'Collector auto-started after restart');
+    startSystemInternal(); // Don't use toggleSystem to avoid double-toggle
+  }
+});
+
+function saveState() {
+  localStorage.setItem('systemRunning', systemRunning);
+  localStorage.setItem('cycleStart', cycleStart);
+}
+
+function startSystemInternal() {
+  const token = localStorage.getItem('gh_token');
+  if (!token) {
+    log('✗ Enter GitHub PAT token first');
+    return;
+  }
+  systemRunning = true;
+  isActive = true;
+  if (!cycleStart) cycleStart = Date.now();
+  saveState();
+  
+  const btn = document.getElementById('toggleBtn');
+  btn.innerText = '⏸️ Stop System';
+  btn.className = 'btn stop';
+  
+  loadExistingIds().then(() => {
+    fetchInterval = setInterval(() => {
+      if (isActive && !isProcessing) {
+        fetchOne(0);
+        fetchOne(1);
+        fetchOne(2);
+      }
+    }, 600);
+    cycleInterval = setInterval(() => {
+      updateCycle();
+      saveState(); // Save state every cycle
+    }, 500);
+    updateCycle();
+  });
+}
+
+function toggleSystem() {
+  if (systemRunning) {
+    systemRunning = false;
+    isActive = false;
+    clearInterval(fetchInterval);
+    clearInterval(cycleInterval);
+    fetchInterval = null;
+    cycleInterval = null;
+    saveState();
+    document.getElementById('toggleBtn').innerText = '▶️ Start System';
+    document.getElementById('toggleBtn').className = 'btn';
+    document.getElementById('status').innerText = 'System Stopped';
+    log('⏸️ System stopped');
+    notify('System Stopped', 'Collector paused');
+  } else {
+    cycleStart = Date.now();
+    startSystemInternal();
+    log('▶️ System started');
+    notify('System Started', 'Collecting from @' + CHANNEL);
+  }
+}
+
+// Handle offline → online
+window.addEventListener('online', () => {
+  if (systemRunning) {
+    log('🌐 Back online - resuming collection');
+    notify('Back Online', 'Resuming collection');
+    isActive = true;
+  }
+});
+
+window.addEventListener('offline', () => {
+  log('📴 Offline - pausing collection');
+  notify('Offline', 'Collection paused until connection returns');
+});
 const CHANNEL = "ehsbeud";
 const GITHUB_USER = "anxroall-a";
 const GITHUB_REPO = "Websitesdatabase";
