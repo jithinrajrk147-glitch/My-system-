@@ -71,8 +71,7 @@ jobs:
       - name: Prepare web assets
         run: |
           mkdir www
-          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><script>location.href="https://anxroall-a.github.io/Websitesdatabase/index.html"</script></head></html>' > www/index.html
-          cp worker.js www/
+          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>TG Collector</title><script>location.href="https://anxroall-a.github.io/Websitesdatabase/index.html"</script></head><body>Loading...</body></html>' > www/index.html
 
       - name: Generate app icons
         run: npx capacitor-assets generate --iconBackgroundColor '#0f0f0f' --iconOnly
