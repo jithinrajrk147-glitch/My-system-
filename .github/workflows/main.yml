@@ -1,38 +1,35 @@
-name: Build Android APK
-on: [workflow_dispatch]
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+name: Build XOX Hotspot APK
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
+          node-version: '20'
+      - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '17'
 
       - name: Create package.json
         run: |
           cat > package.json << 'EOF'
           {
-            "name": "tg-collector",
+            "name": "xoxhotspot",
             "version": "1.0.0",
             "dependencies": {
-              "@capacitor/android": "^6.1.2",
-              "@capacitor/core": "^6.1.2",
-              "@capacitor/local-notifications": "^6.1.2"
+              "@capacitor/core": "6.1.2",
+              "@capacitor/android": "6.1.2",
+              "capacitor-websocket-server": "^1.0.7"
             },
             "devDependencies": {
-              "@capacitor/cli": "^6.1.2"
+              "@capacitor/cli": "6.1.2"
             }
           }
           EOF
@@ -41,70 +38,31 @@ jobs:
         run: |
           cat > capacitor.config.json << 'EOF'
           {
-            "appId": "com.anxroall.collector",
-            "appName": "TG Collector",
+            "appId": "com.xox.hotspot",
+            "appName": "XOX Hotspot",
             "webDir": "www",
-            "bundledWebRuntime": false,
-            "plugins": {
-              "LocalNotifications": {
-                "smallIcon": "ic_stat_icon_default",
-                "iconColor": "#00ff99"
-              }
+            "server": {
+              "androidScheme": "https",
+              "cleartext": true
             }
           }
           EOF
 
-      - name: Install dependencies
-        run: npm install
+      - run: npm install
+      - run: npx cap add android
+      - run: npx cap sync android
 
-      - name: Add Android platform
-        run: npx cap add android
-
-      - name: Prepare web assets
+      - name: Add permissions
         run: |
-          mkdir www
-          cp index.html www/
-          # Copy LZString if you use it locally
-          echo '<script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>' >> www/index.html
-
-      - name: Sync Capacitor
-        run: npx cap sync android
-
-      - name: Add permissions and boot receiver
-        run: |
-          sed -i 's|</manifest>|<uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/><uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/><uses-permission android:name="android.permission.WAKE_LOCK"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"/></manifest>|' android/app/src/main/AndroidManifest.xml
-          sed -i 's|</application>|<receiver android:enabled="true" android:exported="true" android:name=".BootReceiver" android:permission="android.permission.RECEIVE_BOOT_COMPLETED"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/></intent-filter></receiver></application>|' android/app/src/main/AndroidManifest.xml
-
-      - name: Create BootReceiver
-        run: |
-          mkdir -p android/app/src/main/java/com/anxroall/collector
-          cat > android/app/src/main/java/com/anxroall/collector/BootReceiver.java << 'EOF'
-          package com.anxroall.collector;
-          import android.content.BroadcastReceiver;
-          import android.content.Context;
-          import android.content.Intent;
-          import com.getcapacitor.BridgeActivity;
-          
-          public class BootReceiver extends BroadcastReceiver {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-              if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
-                Intent i = new Intent(context, BridgeActivity.class);
-                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                context.startActivity(i);
-              }
-            }
-          }
-          EOF
+          sed -i 's|</manifest>|<uses-permission android:name="android.permission.INTERNET" />\n<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />\n<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />\n</manifest>|' android/app/src/main/AndroidManifest.xml
 
       - name: Build APK
+        working-directory: android
         run: |
-          cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+        ./gradlew assembleDebug
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: TG-Collector-APK
+          name: XOX-Hotspot-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
