@@ -1,60 +1,82 @@
-name: Build XOX Hotspot APK
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+name: Build XOX Hotspot Opener
+on: workflow_dispatch
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Create package.json
+      - name: Create app files
         run: |
-          cat > package.json << 'EOF'
-          {
-            "name": "xoxhotspot",
-            "version": "1.0.0",
-            "dependencies": {
-              "@capacitor/core": "6.1.2",
-              "@capacitor/android": "6.1.2",
-              "capacitor-websocket-server": "^1.0.7"
-            },
-            "devDependencies": {
-              "@capacitor/cli": "6.1.2"
-            }
-          }
-          EOF
-
-      - name: Create capacitor.config.json
-        run: |
-          cat > capacitor.config.json << 'EOF'
-          {
-            "appId": "com.xox.hotspot",
-            "appName": "XOX Hotspot",
-            "webDir": "www",
-            "server": {
-              "androidScheme": "https",
-              "cleartext": true
-            }
-          }
+          echo '{"name":"xoxhotspot","version":"1.0.0","dependencies":{"@capacitor/core":"6.1.2","@capacitor/android":"6.1.2"},"devDependencies":{"@capacitor/cli":"6.1.2"}}' > package.json
+          
+          echo '{"appId":"com.xox.hotspot","appName":"XOX Hotspot","webDir":"www"}' > capacitor.config.json
+          
+          mkdir www
+          cat > www/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>XOX Hotspot</title>
+            <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              body { 
+                font-family: system-ui; 
+                background: #0d1117; 
+                color: #fff; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+                min-height: 100vh; 
+                text-align: center;
+              }
+              .container { padding: 20px; }
+              h1 { font-size: 32px; margin-bottom: 10px; color: #00ff88; }
+              p { color: #8b949e; margin-bottom: 40px; }
+              button { 
+                background: #00ff88; 
+                color: #000; 
+                border: none; 
+                padding: 20px 50px; 
+                font-size: 18px; 
+                font-weight: bold;
+                border-radius: 12px; 
+                cursor: pointer;
+                box-shadow: 0 4px 20px rgba(0,255,136,0.3);
+              }
+              button:active { transform: scale(0.95); }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>XOX Hotspot</h1>
+              <p>Tap below to open Hotspot Settings</p>
+              <button onclick="openHotspot()">Open Hotspot Settings</button>
+            </div>
+            <script>
+              function openHotspot() {
+                window.location.href = 'intent:#Intent;action=android.settings.WIRELESS_SETTINGS;end';
+              }
+            </script>
+          </body>
+          </html>
           EOF
 
       - run: npm install
       - run: npx cap add android
       - run: npx cap sync android
-
-      - name: Add permissions
-        run: |
-          sed -i 's|</manifest>|<uses-permission android:name="android.permission.INTERNET" />\n<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />\n<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />\n</manifest>|' android/app/src/main/AndroidManifest.xml
 
       - name: Build APK
         working-directory: android
