@@ -1,553 +1,192 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Telegram Collector - Clean Database</title>
-<script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
-<script type="module">
-  import { Capacitor } from 'https://cdn.jsdelivr.net/npm/@capacitor/core@6.1.2/+esm';
-  if (Capacitor.isNativePlatform()) {
-    const { KeepAwake } = await import('https://cdn.jsdelivr.net/npm/@capacitor-community/keep-awake@5.0.2/+esm');
-    KeepAwake.keepAwake();
-    console.log('KeepAwake enabled');
-  }
-</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>XOX Hotspot</title>
 <style>
-body {margin:0;font-family:Arial;background:#0f0f0f;color:white;}
-#topBar {background:#1f1f1f;padding:10px;overflow-x:auto;white-space:nowrap;border-bottom:1px solid #333;}
-.tag {display:inline-block;background:#00ff99;color:black;padding:5px 10px;margin:3px;border-radius:20px;font-size:12px;}
-#status {text-align:center;font-size:12px;padding:8px;color:#aaa;font-weight:bold;}
-#status.active { color:#00ff99; }
-#status.resting { color:#f78166; }
-#status.checking { color:#1f6feb; }
-#status.pushing { color:#f0883e; }
-#status.error { color:#f85149; }
-#controls {background:#1a1a1a;padding:10px;text-align:center;border-bottom:1px solid #333;}
-.btn {background:#238636;border:none;color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;cursor:pointer;margin:0 5px;}
-.btn:hover { background:#2ea043; }
-.btn.stop { background:#da3633; }
-.btn.stop:hover { background:#f85149; }
-.token-input {background:#0d1117;border:1px solid #30363d;color:#fff;padding:6px 10px;border-radius:6px;font-size:12px;width:200px;margin-right:5px;}
-.stats {display:inline-block;font-size:11px;color:#7d8590;margin-left:10px;}
-#feed {padding:10px;max-height:75vh;overflow-y:auto;}
-.post {background:#1a1a1a;padding:12px;margin-bottom:10px;border-radius:10px;}
-.post-header {display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
-.badge {font-size:10px;padding:3px 8px;border-radius:4px;background:#00ff99;color:#000;font-weight:bold;}
-.badge.duplicate { background:#f78166; }
-.badge.new { background:#238636; }
-.badge.pending { background:#6e7681; }
-.badge.failed { background:#f85149; }
-.compressed-text {word-break:break-all;font-size:11px;color:#666;max-height:30px;overflow:hidden;margin-bottom:6px;}
-.parsed {margin-top:8px;padding:10px;background:#0d1117;border-radius:6px;font-size:12px;font-family:monospace;border-left:3px solid #00ff99;}
-.error {color:#f85149;font-size:12px;padding:8px;background:#1f1617;border-radius:6px;}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial;-webkit-tap-highlight-color:transparent}
+body{background:#0d1117;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+h1{color:#58a6ff;margin-bottom:10px;font-size:24px}
+#lobby{position:fixed;top:0;left:0;width:100%;height:100%;background:#0d1117;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;padding:20px}
+#lobby button{padding:16px 32px;margin:8px;background:#238636;color:#fff;border:none;border-radius:8px;font-size:18px;font-weight:bold;width:100%;max-width:280px}
+#lobby button:active{background:#2ea043}
+#lobby input{padding:14px;margin:8px;border-radius:8px;border:2px solid #30363d;background:#21262d;color:#fff;text-align:center;font-size:18px;width:100%;max-width:280px}
+#ipBox{margin:15px;padding:15px;background:#161b22;border-radius:8px;border:2px solid #30363d;width:100%;max-width:280px;text-align:center}
+#ipBox b{color:#58a6ff;font-size:18px}
+.small{font-size:13px;color:#8b949e;margin:5px 0;text-align:center;line-height:1.4}
+#status{font-size:18px;margin:15px 0;color:#f0883e;font-weight:bold;min-height:24px;text-align:center}
+#board{display:grid;grid-template-columns:repeat(3,90px);grid-template-rows:repeat(3,90px);gap:6px;background:#161b22;padding:6px;border-radius:12px;margin:10px 0}
+.cell{width:90px;height:90px;background:#21262d;border:2px solid #30363d;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:50px;font-weight:bold;cursor:pointer}
+.cell:active{background:#30363d}
+.cell.x{color:#da3633}
+.cell.o{color:#58a6ff}
+.cell.disabled{cursor:not-allowed;opacity:0.6}
+#info{font-size:14px;color:#8b949e;margin-top:10px}
+#youare{color:#f0883e;font-weight:bold}
 </style>
 </head>
 <body>
-<div id="topBar"></div>
-<div id="controls">
-  <button class="btn" id="toggleBtn" onclick="toggleSystem()">▶️ Start System</button>
-  <input type="password" class="token-input" id="tokenInput" placeholder="GitHub PAT token" />
-  <button class="btn" onclick="saveToken()">💾 Save Token</button>
-  <span class="stats">Speed: <span id="speed">0</span> msg/s | Pending: <span id="pending">0</span> | Failed: <span id="failed">0</span></span>
+<div id="lobby">
+  <h1>XOX HOTSPOT</h1>
+  <div class="small">Step 1: Host turns on WiFi Hotspot<br>Step 2: Others connect to hotspot</div>
+  <button id="hostBtn">HOST GAME</button>
+  <div id="ipBox" style="display:none">
+    <div class="small">Friends join this IP:</div>
+    <b id="hostIP">-</b>
+    <div class="small">Waiting for player...</div>
+  </div>
+  <div style="margin:15px 0">OR</div>
+  <input id="joinIP" placeholder="192.168.43.1" value="192.168.43.1">
+  <button id="joinBtn">JOIN GAME</button>
+  <div id="errText" class="small" style="color:#da3633;margin-top:10px"></div>
 </div>
-<div id="status" class="active">System Stopped</div>
-<div id="feed"></div>
+
+<h1>XOX GAME</h1>
+<div id="status">Waiting...</div>
+<div id="board">
+  <div class="cell" data-i="0"></div><div class="cell" data-i="1"></div><div class="cell" data-i="2"></div>
+  <div class="cell" data-i="3"></div><div class="cell" data-i="4"></div><div class="cell" data-i="5"></div>
+  <div class="cell" data-i="6"></div><div class="cell" data-i="7"></div><div class="cell" data-i="8"></div>
+</div>
+<div id="info">You are: <span id="youare">-</span></div>
+
 <script>
-const CHANNEL = "ehsbeud";
-const GITHUB_USER = "anxroall-a";
-const GITHUB_REPO = "Websitesdatabase";
-let seen = new Set();
-let isActive = false;
-let systemRunning = false;
-let cycleStart = Date.now();
-let pendingUnits = [];
-let failedUnits = [];
-let fetchInterval = null;
-let cycleInterval = null;
-let isProcessing = false;
-let msgCount = 0;
-let lastSpeedCheck = Date.now();
+let board = ["","","","","","","","",""];
+let currentPlayer = "X";
+let gameActive = false;
+let myPlayer = "";
+let ws = null;
+let isHost = false;
 
-const ACTIVE_TIME = 2*60*1000;
-const REST_TIME = 3*60*1000;
-const FILE_SIZE_LIMIT = 950 * 1024;
+const statusDiv = document.getElementById('status');
+const cells = document.querySelectorAll('.cell');
+const youareDiv = document.getElementById('youare');
+const errText = document.getElementById('errText');
+const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 
-// Auto-resume on page load
-window.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('tokenInput').value = localStorage.getItem('gh_token') || '';
-  systemRunning = localStorage.getItem('systemRunning') === 'true';
-  cycleStart = parseInt(localStorage.getItem('cycleStart')) || Date.now();
-
-  if (systemRunning) {
-    log('🔄 Auto-resuming system...');
-    startSystemInternal();
-  }
-});
-
-function saveState() {
-  localStorage.setItem('systemRunning', systemRunning);
-  localStorage.setItem('cycleStart', cycleStart);
+function updateBoard(){
+  cells.forEach((cell,i) => {
+    cell.textContent = board[i];
+    cell.className = 'cell';
+    if(board[i]) cell.classList.add(board[i].toLowerCase());
+    if(!gameActive || myPlayer!== currentPlayer || board[i]) cell.classList.add('disabled');
+  });
 }
 
-function saveToken() {
-  const token = document.getElementById('tokenInput').value.trim();
-  if (token) {
-    localStorage.setItem('gh_token', token);
-    alert('Token saved');
-  }
+function checkWin(){
+  return wins.some(c => c.every(i => board[i] === currentPlayer && board[i]!== ""));
 }
 
-function updatePendingCount() {
-  document.getElementById('pending').innerText = pendingUnits.length;
-  document.getElementById('failed').innerText = failedUnits.length;
+function handleClick(e){
+  if(!gameActive || myPlayer!== currentPlayer) return;
+  const i = e.target.dataset.i;
+  if(board[i]!== "") return;
+  board[i] = currentPlayer;
+  sendMsg({t:'move',i:i,p:currentPlayer});
+  afterMove();
 }
 
-async function loadExistingIds() {
-  try {
-    const url = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/Database.json`;
-    const res = await fetch(url);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        data.forEach(item => {
-          if (item.link) seen.add(item.link);
-          if (item.name && item.link) seen.add(item.name + item.link);
-        });
-        console.log(`Loaded ${data.length} existing items`);
-      }
-    }
-  } catch (e) {
-    console.log('No existing Database.json');
-  }
-}
-
-function startSystemInternal() {
-  const token = localStorage.getItem('gh_token');
-  if (!token) {
-    log('✗ Enter GitHub PAT token first');
+function afterMove(){
+  updateBoard();
+  if(checkWin()){
+    statusDiv.textContent = `Player ${currentPlayer} Wins!`;
+    gameActive = false;
+    setTimeout(resetGame, 2500);
     return;
   }
-  systemRunning = true;
-  isActive = true;
-  if (!cycleStart) cycleStart = Date.now();
-  saveState();
-
-  const btn = document.getElementById('toggleBtn');
-  btn.innerText = '⏸️ Stop System';
-  btn.className = 'btn stop';
-
-  loadExistingIds().then(() => {
-    fetchInterval = setInterval(() => {
-      if (isActive &&!isProcessing) {
-        fetchOne(0);
-        fetchOne(1);
-        fetchOne(2);
-      }
-    }, 600);
-    cycleInterval = setInterval(() => {
-      updateCycle();
-      saveState();
-    }, 500);
-    for (let i = 0; i < 9; i++) {
-      setTimeout(() => fetchOne(i % 3), i * 100);
-    }
-    updateCycle();
-  });
+  if(board.every(c => c!== "")){
+    statusDiv.textContent = "Draw!";
+    gameActive = false;
+    setTimeout(resetGame, 2500);
+    return;
+  }
+  currentPlayer = currentPlayer === "X"? "O" : "X";
+  statusDiv.textContent = `Player ${currentPlayer} Turn`;
+  updateBoard();
 }
 
-function toggleSystem() {
-  const btn = document.getElementById('toggleBtn');
-  if (systemRunning) {
-    systemRunning = false;
-    isActive = false;
-    clearInterval(fetchInterval);
-    clearInterval(cycleInterval);
-    fetchInterval = null;
-    cycleInterval = null;
-    saveState();
-    btn.innerText = '▶️ Start System';
-    btn.className = 'btn';
-    document.getElementById('status').innerText = 'System Stopped';
-    document.getElementById('status').className = '';
-    log('⏸️ System stopped');
-  } else {
-    cycleStart = Date.now();
-    startSystemInternal();
-    log('▶️ System started');
+function resetGame(){
+  board = ["","","","","","","","",""];
+  currentPlayer = "X";
+  gameActive = true;
+  statusDiv.textContent = `Player ${currentPlayer} Turn`;
+  updateBoard();
+}
+
+function sendMsg(data){
+  const msg = JSON.stringify(data);
+  if(ws && ws.readyState === 1) ws.send(msg);
+}
+
+function handleMsg(data){
+  if(data.t === 'move'){
+    board[data.i] = data.p;
+    afterMove();
+  }
+  if(data.t === 'start'){
+    myPlayer = data.yourPlayer;
+    youareDiv.textContent = myPlayer;
+    document.getElementById('lobby').style.display = 'none';
+    gameActive = true;
+    statusDiv.textContent = `Player ${currentPlayer} Turn`;
+    updateBoard();
   }
 }
 
-async function fetchOne(proxyIndex = 0) {
-  if (!isActive ||!systemRunning || isProcessing) return;
+async function startHost(){
+  isHost = true;
+  myPlayer = "X";
+  youareDiv.textContent = myPlayer;
+  errText.textContent = "";
+
+  // This plugin works in 2026
+  if(!window.Capacitor ||!window.Capacitor.Plugins.WebSocketServer){
+    errText.textContent = "Plugin missing. Rebuild APK.";
+    return;
+  }
+
   try {
-    let random = Date.now() + "_" + Math.random();
-    const proxies = [
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://t.me/s/${CHANNEL}?v=${random}`)}`,
-      `https://corsproxy.io/?${encodeURIComponent(`https://t.me/s/${CHANNEL}?v=${random}`)}`,
-      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://t.me/s/${CHANNEL}?v=${random}`)}`
-    ];
-    const proxyUrl = proxies[proxyIndex];
-    let res = await fetch(proxyUrl, {
-      method: 'GET',
-      headers: { 'Accept': 'text/html' },
-      signal: AbortSignal.timeout(1500)
+    const WSServer = window.Capacitor.Plugins.WebSocketServer;
+    const result = await WSServer.start({port: 8080});
+
+    document.getElementById('ipBox').style.display = 'block';
+    document.getElementById('hostIP').textContent = result.address + ':8080';
+
+    WSServer.addListener('clientConnected', (info) => {
+      WSServer.send({connId: info.connId, data: JSON.stringify({t:'start', yourPlayer:'O'})});
+      document.getElementById('lobby').style.display = 'none';
+      gameActive = true;
+      statusDiv.textContent = `Player ${currentPlayer} Turn`;
+      updateBoard();
     });
-    if (!res.ok) return;
-    let html = await res.text();
-    if (!html || html.length < 100) return;
-    let doc = new DOMParser().parseFromString(html, "text/html");
-    let posts = doc.querySelectorAll(".tgme_widget_message_text");
-    if (posts.length === 0) return;
-    posts.forEach(p => {
-      let compressedText = p.innerText.trim();
-      if (!seen.has(compressedText) && compressedText.length > 10) {
-        seen.add(compressedText);
-        processMessage(compressedText);
-        msgCount++;
-      }
+
+    WSServer.addListener('message', (info) => {
+      handleMsg(JSON.parse(info.data));
     });
-  } catch (e) {}
+
+  } catch(e) {
+    errText.textContent = 'Host error: ' + e.message;
+  }
 }
 
-setInterval(() => {
-  const now = Date.now();
-  const elapsed = (now - lastSpeedCheck) / 1000;
-  const speed = (msgCount / elapsed).toFixed(1);
-  document.getElementById('speed').innerText = speed;
-  msgCount = 0;
-  lastSpeedCheck = now;
-}, 1000);
+function joinGame(){
+  let ip = document.getElementById('joinIP').value.trim() || '192.168.43.1';
+  errText.textContent = "Connecting...";
 
-function processMessage(compressedText) {
-  const topBar = document.getElementById("topBar");
-  const feed = document.getElementById("feed");
-  let jsonData = null;
-  let parseError = null;
-  let isCompressed = false;
-  try {
-    const decompressed = LZString.decompressFromUTF16(compressedText);
-    if (decompressed && decompressed!== compressedText) {
-      try {
-        jsonData = JSON.parse(decompressed);
-        isCompressed = true;
-      } catch(e) {
-        parseError = 'Decompressed but not valid JSON';
-      }
-    }
-  } catch (e) {
-    isCompressed = false;
-  }
-  if (!jsonData &&!isCompressed) {
-    try {
-      jsonData = JSON.parse(compressedText);
-      parseError = null;
-    } catch(e) {
-      parseError = 'Not JSON - plain text message';
-    }
-  }
-  if (jsonData) {
-    jsonData.id = jsonData.id || crypto.randomUUID();
-    jsonData._compressed = compressedText;
-    jsonData._status = 'pending';
-    seen.add(jsonData.link);
-    seen.add(jsonData.name + jsonData.link);
-    pendingUnits.push(jsonData);
-    updatePendingCount();
-  }
-  let tag = document.createElement("div");
-  tag.className = "tag";
-  tag.innerText = compressedText.substring(0, 20) + "...";
-  topBar.prepend(tag);
-  let div = document.createElement("div");
-  div.className = "post";
-  div.dataset.compressed = compressedText;
-  let header = document.createElement("div");
-  header.className = "post-header";
-  let badge = document.createElement("span");
-  badge.className = jsonData? "badge pending" : "badge duplicate";
-  badge.innerText = jsonData? "PENDING" : "SKIP";
-  header.appendChild(badge);
-  div.appendChild(header);
-  let compressedDiv = document.createElement("div");
-  compressedDiv.className = "compressed-text";
-  compressedDiv.innerText = (isCompressed? "Compressed: " : "JSON: ") + compressedText.substring(0, 100) + "...";
-  div.appendChild(compressedDiv);
-  if (jsonData) {
-    let parsed = document.createElement("div");
-    parsed.className = "parsed";
-    parsed.innerHTML = `<b>Name:</b> ${jsonData.name || 'N/A'}<br><b>Link:</b> ${jsonData.link || 'N/A'}<br><b>Domain:</b> ${jsonData.domain || 'N/A'}<br><b>Type:</b> ${jsonData.type || 'N/A'}<br><b>Keywords:</b> ${(jsonData.keywords || []).join(', ')}<br><b>Location:</b> ${jsonData.location?.lat || '?'}, ${jsonData.location?.lng || '?'}<br><b>Description:</b> ${jsonData.description || 'N/A'}`;
-    div.appendChild(parsed);
-  } else {
-    let err = document.createElement("div");
-    err.className = "error";
-    err.innerText = "⚠ " + (parseError || 'Skipped - not valid JSON');
-    div.appendChild(err);
-  }
-  feed.prepend(div);
-}
-
-async function checkAllPendingUnits() {
-  if (pendingUnits.length === 0) return { newItems: [], duplicates: [] };
-  document.getElementById("status").innerText = "Step 3: Checking GitHub database...";
-  document.getElementById("status").className = "checking";
-  let existingData = [];
-  try {
-    const apiUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/`;
-    const res = await fetch(apiUrl, { signal: AbortSignal.timeout(8000) });
-    if (res.ok) {
-      const files = await res.json();
-      const jsonFiles = files.filter(f => f.name.endsWith('.json') && f.name.startsWith('Database'));
-      for (let file of jsonFiles) {
-        try {
-          const fileRes = await fetch(file.download_url, { signal: AbortSignal.timeout(5000) });
-          if (fileRes.ok) {
-            const data = await fileRes.json();
-            if (Array.isArray(data)) {
-              existingData.push(...data.flat(Infinity));
-            }
-          }
-        } catch (e) {}
-      }
-    }
-  } catch (e) {}
-  let newItems = [];
-  let duplicates = [];
-  pendingUnits.forEach(newItem => {
-    const isDuplicate = existingData.some(existing => {
-      return existing.link === newItem.link && existing.name === newItem.name && existing.domain === newItem.domain;
-    });
-    if (isDuplicate) {
-      duplicates.push(newItem);
-    } else {
-      newItems.push(newItem);
-    }
-  });
-  updateBadges(newItems, duplicates);
-  return { newItems, duplicates };
-}
-
-function updateBadges(newItems, duplicates) {
-  const posts = document.querySelectorAll('.post');
-  const newLinks = new Set(newItems.map(i => i.link));
-  posts.forEach(post => {
-    const parsed = post.querySelector('.parsed');
-    if (!parsed) return;
-    const linkMatch = parsed.innerHTML.match(/<b>Link:<\/b> ([^<]+)/);
-    if (!linkMatch) return;
-    const link = linkMatch[1];
-    const badge = post.querySelector('.badge');
-    if (newLinks.has(link)) {
-      badge.innerText = "✓ NEW";
-      badge.className = "badge new";
-    } else {
-      badge.innerText = "⚠ DUPLICATE";
-      badge.className = "badge duplicate";
-    }
-  });
-}
-
-async function pushToGitHub(newItems) {
-  if (newItems.length === 0) return false;
-  const token = localStorage.getItem('gh_token');
-  if (!token) {
-    document.getElementById("status").innerText = "✗ No token";
-    document.getElementById("status").className = "error";
-    alert('No GitHub token! Add token first.');
-    return false;
-  }
-  document.getElementById("status").innerText = "Pushing to GitHub...";
-  document.getElementById("status").className = "pushing";
-  const fileName = 'Database.json';
-  const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${fileName}`;
-  let sha = null;
-  let existingContent = [];
-  try {
-    const getRes = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `token ${token}`,
-        'Accept': 'application/vnd.github.v3+json'
-      }
-    });
-    if (getRes.status === 200) {
-      const data = await getRes.json();
-      sha = data.sha;
-      const decoded = atob(data.content);
-      existingContent = JSON.parse(decoded);
-      if (!Array.isArray(existingContent)) existingContent = [];
-    } else if (getRes.status === 404) {
-      sha = null;
-      existingContent = [];
-    } else if (getRes.status === 401 || getRes.status === 403) {
-      document.getElementById("status").innerText = "✗ Token permission denied";
-      document.getElementById("status").className = "error";
-      alert('ERROR: Token cannot access repo.\n\nFix: GitHub → Settings → Developer settings → Personal access tokens → Generate new → CHECK "repo" box → Save new token');
-      return false;
-    } else {
-      document.getElementById("status").innerText = "✗ Cannot read file";
-      document.getElementById("status").className = "error";
-      alert(`Cannot read Database.json: ${getRes.status}`);
-      return false;
-    }
-  } catch (e) {
-    document.getElementById("status").innerText = "✗ Network error";
-    document.getElementById("status").className = "error";
-    alert('Network error: ' + e.message);
-    return false;
-  }
-
-  const cleanNewItems = newItems.map(item => {
-    const clean = {...item};
-    delete clean._compressed;
-    delete clean._status;
-    return clean;
-  });
-
-  const updatedContent = [...existingContent,...cleanNewItems];
-  const jsonStr = JSON.stringify(updatedContent, null, 2);
-  if (jsonStr.length > FILE_SIZE_LIMIT) {
-    document.getElementById("status").innerText = "✗ File too large >950KB";
-    document.getElementById("status").className = "error";
-    alert('Database.json will exceed 950KB. Cannot push.');
-    return false;
-  }
-  const base64Content = btoa(unescape(encodeURIComponent(jsonStr)));
-  const body = {
-    message: `Update: Add ${cleanNewItems.length} websites`,
-    content: base64Content
+  ws = new WebSocket(`ws://${ip}:8080`);
+  ws.onopen = () => { errText.textContent = "Connected! Waiting for host..."; };
+  ws.onmessage = (e) => { handleMsg(JSON.parse(e.data)); };
+  ws.onerror = () => { errText.textContent = "Failed. Check hotspot & IP"; };
+  ws.onclose = () => {
+    statusDiv.textContent = "Disconnected";
+    gameActive = false;
+    document.getElementById('lobby').style.display = 'flex';
   };
-  if (sha) {
-    body.sha = sha;
-  }
-  try {
-    const putRes = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `token ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/vnd.github.v3+json'
-      },
-      body: JSON.stringify(body)
-    });
-    if (putRes.ok) {
-      document.getElementById("status").innerText = `✓ Pushed ${cleanNewItems.length} items`;
-      document.getElementById("status").className = "active";
-      return true;
-    } else {
-      const err = await putRes.json();
-      document.getElementById("status").innerText = `✗ Failed: ${err.message}`;
-      document.getElementById("status").className = "error";
-      alert(`Push failed: ${err.message}\n\nMost common cause: Token missing "repo" permission. Create new token with "repo" checked.`);
-      return false;
-    }
-  } catch (e) {
-    document.getElementById("status").innerText = "✗ Push error";
-    document.getElementById("status").className = "error";
-    alert('Push error: ' + e.message);
-    return false;
-  }
 }
 
-async function processBatch() {
-  if (pendingUnits.length === 0) return;
-  isProcessing = true;
-  isActive = false;
-  const { newItems, duplicates } = await checkAllPendingUnits();
-  let pushSuccess = true;
-  if (newItems.length > 0) {
-    pushSuccess = await pushToGitHub(newItems);
-  } else {
-    document.getElementById("status").innerText = "All items already in database. Nothing to push.";
-    document.getElementById("status").className = "active";
-  }
-  if (pushSuccess || newItems.length === 0) {
-    if (!pushSuccess && newItems.length > 0) {
-      failedUnits.push(...newItems);
-      updateBadgesForFailed(newItems);
-      updatePendingCount();
-    } else {
-      pendingUnits = [];
-      updatePendingCount();
-      document.getElementById('feed').innerHTML = '';
-      document.getElementById('topBar').innerHTML = '';
-    }
-  } else {
-    failedUnits.push(...newItems);
-    updateBadgesForFailed(newItems);
-    updatePendingCount();
-  }
-  isProcessing = false;
-}
-
-function updateBadgesForFailed(items) {
-  const posts = document.querySelectorAll('.post');
-  const failedLinks = new Set(items.map(i => i.link));
-  posts.forEach(post => {
-    const parsed = post.querySelector('.parsed');
-    if (!parsed) return;
-    const linkMatch = parsed.innerHTML.match(/<b>Link:<\/b> ([^<]+)/);
-    if (!linkMatch) return;
-    const link = linkMatch[1];
-    const badge = post.querySelector('.badge');
-    if (failedLinks.has(link)) {
-      badge.innerText = "✗ FAILED";
-      badge.className = "badge failed";
-    }
-  });
-}
-
-function updateCycle() {
-  if (!systemRunning) return;
-  const elapsed = Date.now() - cycleStart;
-  if (isActive && elapsed >= ACTIVE_TIME) {
-    processBatch();
-    isActive = false;
-    cycleStart = Date.now();
-    setTimeout(() => {
-      if (systemRunning) {
-        document.getElementById("status").innerText = "Resting: 3 min pause...";
-        document.getElementById("status").className = "resting";
-      }
-    }, 2000);
-  } else if (!isActive && elapsed >= REST_TIME) {
-    isActive = true;
-    cycleStart = Date.now();
-    document.getElementById("status").innerText = "Active: 2 min collecting...";
-    document.getElementById("status").className = "active";
-  } else {
-    const remaining = isActive? ACTIVE_TIME - elapsed : REST_TIME - elapsed;
-    const mins = Math.floor(remaining / 60000);
-    const secs = Math.floor((remaining % 60000) / 1000);
-    const state = isActive? "Active" : "Resting";
-    const statusEl = document.getElementById("status");
-    if (!statusEl.className.includes("checking") &&!statusEl.className.includes("pushing") &&!statusEl.className.includes("error")) {
-      statusEl.innerText = `${state}: ${mins}m ${secs}s remaining`;
-    }
-  }
-}
-
-function log(msg) {
-  console.log(msg);
-}
-
-// Handle offline → online
-window.addEventListener('online', () => {
-  if (systemRunning &&!fetchInterval) {
-    log('🌐 Back online - resuming collection');
-    isActive = true;
-    fetchInterval = setInterval(() => {
-      if (isActive &&!isProcessing) {
-        fetchOne(0);
-        fetchOne(1);
-        fetchOne(2);
-      }
-    }, 600);
-  }
-});
-
-window.addEventListener('offline', () => {
-  log('📴 Offline - pausing collection');
-});
+cells.forEach(c => c.onclick = handleClick);
+document.getElementById('hostBtn').onclick = startHost;
+document.getElementById('joinBtn').onclick = joinGame;
 </script>
 </body>
 </html>
