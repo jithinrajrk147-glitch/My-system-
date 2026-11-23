@@ -9,8 +9,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      ANDROID_HOME: /usr/local/lib/【entity-android¦canonical_name=Android】/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/【entity-android¦canonical_name=Android】/sdk
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,14 +21,12 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Check SDK
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          ls $ANDROID_HOME
-          java -version
-          ls /usr/local/lib/android/sdk/cmdline-tools/ || true
+      # ===== FIX: Force Gradle 8.2, not 9.9 =====
+      - name: Setup Gradle 8.2
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.2'
 
-      # ===== AUTO CREATE ALL FILES =====
       - name: Auto Create App Files
         run: |
           mkdir -p app/src/main/java/com/torchat/app
@@ -44,13 +42,13 @@ jobs:
           EOF
 
           cat > build.gradle <<'EOF'
-          buildscript { repositories { google(); mavenCentral() } dependencies { classpath 'com.android.application:8.2.2' classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22' } }
+          buildscript { repositories { google(); mavenCentral() } dependencies { classpath 'com.【entity-android¦canonical_name=Android】.application:8.2.2' classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22' } }
           allprojects { repositories { google(); mavenCentral() } }
           EOF
 
           cat > app/build.gradle <<'EOF'
-          plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
-          android {
+          plugins { id 'com.【entity-android¦canonical_name=Android】.application'; id 'org.jetbrains.kotlin.【entity-android¦canonical_name=Android】' }
+          【entity-android¦canonical_name=Android】 {
             namespace 'com.torchat.app'
             compileSdk 34
             defaultConfig { applicationId "com.torchat.app"; minSdk 24; targetSdk 34; versionCode 1; versionName "1.0" }
@@ -61,31 +59,31 @@ jobs:
           dependencies {
             implementation 'androidx.core:core-ktx:1.12.0'
             implementation 'androidx.appcompat:appcompat:1.6.1'
-            implementation 'com.google.android.material:material:1.11.0'
+            implementation 'com.google.【entity-android¦canonical_name=Android】.material:material:1.11.0'
             implementation 'androidx.webkit:webkit:1.9.0'
-            implementation 'org.torproject:tor-android:0.4.7.13'
+            implementation 'org.torproject:tor-【entity-android¦canonical_name=Android】:0.4.7.13'
             implementation 'com.google.code.gson:gson:2.10.1'
           }
           EOF
 
           cat > app/src/main/AndroidManifest.xml <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-            <uses-permission android:name="android.permission.INTERNET" />
-            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-            <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-            <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-            <application android:label="TorChat" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:usesCleartextTraffic="true">
-              <activity android:name=".MainActivity" android:exported="true">
-                <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+          <manifest xmlns:【entity-android¦canonical_name=Android】="http://schemas.android.com/apk/res/android">
+            <uses-permission 【entity-android¦canonical_name=Android】:name="【entity-android¦canonical_name=Android】.permission.INTERNET" />
+            <uses-permission 【entity-android¦canonical_name=Android】:name="【entity-android¦canonical_name=Android】.permission.ACCESS_NETWORK_STATE" />
+            <uses-permission 【entity-android¦canonical_name=Android】:name="【entity-android¦canonical_name=Android】.permission.FOREGROUND_SERVICE" />
+            <uses-permission 【entity-android¦canonical_name=Android】:name="【entity-android¦canonical_name=Android】.permission.POST_NOTIFICATIONS" />
+            <application 【entity-android¦canonical_name=Android】:label="TorChat" 【entity-android¦canonical_name=Android】:theme="@【entity-android¦canonical_name=Android】:style/Theme.Material.Light.NoActionBar" 【entity-android¦canonical_name=Android】:usesCleartextTraffic="true">
+              <activity 【entity-android¦canonical_name=Android】:name=".MainActivity" 【entity-android¦canonical_name=Android】:exported="true">
+                <intent-filter><action 【entity-android¦canonical_name=Android】:name="【entity-android¦canonical_name=Android】.intent.action.MAIN" /><category 【entity-android¦canonical_name=Android】:name="【entity-android¦canonical_name=Android】.intent.category.LAUNCHER" /></intent-filter>
               </activity>
-              <service android:name=".TorService" android:foregroundServiceType="dataSync" />
+              <service 【entity-android¦canonical_name=Android】:name=".TorService" 【entity-android¦canonical_name=Android】:foregroundServiceType="dataSync" />
             </application>
           </manifest>
           EOF
 
           cat > app/src/main/res/values/themes.xml <<'EOF'
-          <resources><style name="Theme" parent="android:Theme.Material.Light.NoActionBar" /></resources>
+          <resources><style name="Theme" parent="【entity-android¦canonical_name=Android】:Theme.Material.Light.NoActionBar" /></resources>
           EOF
 
           cat > app/src/main/assets/index.html <<'EOF'
@@ -121,8 +119,8 @@ jobs:
           </div>
           <script>
           function copyId(){ const t=document.getElementById('myId').innerText; navigator.clipboard.writeText(t); alert('ID Copied: '+t); }
-          function addFriend(){ const fid=document.getElementById('friendId').value.trim(); if(!fid) return alert('Paste friend ID'); document.getElementById('connStatus').innerText='Connecting to '+fid.slice(0,12)+'... via Tor'; Android.addFriend(fid); }
-          function sendMsg(){ const m=document.getElementById('msgInput').value; if(!m) return; addBubble(m,'me'); document.getElementById('msgInput').value=''; Android.sendMessage(m); }
+          function addFriend(){ const fid=document.getElementById('friendId').value.trim(); if(!fid) return alert('Paste friend ID'); document.getElementById('connStatus').innerText='Connecting to '+fid.slice(0,12)+'... via Tor'; 【entity-Android¦canonical_name=Android】.addFriend(fid); }
+          function sendMsg(){ const m=document.getElementById('msgInput').value; if(!m) return; addBubble(m,'me'); document.getElementById('msgInput').value=''; 【entity-Android¦canonical_name=Android】.sendMessage(m); }
           function addBubble(t,who){ const d=document.createElement('div'); d.className='msg '+who; d.innerText=t; document.getElementById('chat').appendChild(d); document.getElementById('chat').scrollTop=9999; }
           function setMyId(id){ document.getElementById('myId').innerText=id; document.getElementById('torStatus').innerText='Tor Connected - Onion Ready'; }
           function onMessage(msg){ addBubble(msg,'other'); }
@@ -132,11 +130,11 @@ jobs:
 
           cat > app/src/main/java/com/torchat/app/MainActivity.kt <<'EOF'
           package com.torchat.app
-          import android.annotation.SuppressLint
-          import android.os.Bundle
-          import android.webkit.JavascriptInterface
-          import android.webkit.WebView
-          import android.webkit.WebViewClient
+          import 【entity-android¦canonical_name=Android】.annotation.SuppressLint
+          import 【entity-android¦canonical_name=Android】.os.Bundle
+          import 【entity-android¦canonical_name=Android】.webkit.JavascriptInterface
+          import 【entity-android¦canonical_name=Android】.webkit.WebView
+          import 【entity-android¦canonical_name=Android】.webkit.WebViewClient
           import androidx.appcompat.app.AppCompatActivity
           class MainActivity : AppCompatActivity() {
               lateinit var webView: WebView
@@ -288,11 +286,11 @@ jobs:
           zipStoreBase=GRADLE_USER_HOME
           zipStorePath=wrapper/dists
           EOF
+          gradle --version
           ls -R
 
-      - name: Build APK with Gradle
-        run: gradle assembleDebug --stacktrace --info
-        working-directory: .
+      - name: Build APK
+        run: gradle assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
